@@ -1,0 +1,197 @@
+#'EO```
+
+### 
+#ent]
+
+#  s
+- P. 目- P
+
+    - - `action` 仅允许 `create|update|dele��- `summary` MUST 为 -- `summary` MUST 为用户��- `re- `risks` MAY
+event_id: string
+task_id: string
+event_typ## 4. 扩展字段
+
+未来允许增加：
+
+
+`
+未来允许增噄�
+-  i
+未来允许�ssi未id- `subtasks`
+- `deri- `deped:- tr
+cat > docs/spe:
+ 
+c - 
+## 1. 目标
+
+定义 Planner 输出的�
+
+ 
+c - 
+## 1. �d`
+-## la
+定义 Plted`定义 Plal
+a## 1. 目标
+
+
+�
+定义 Pla都
+## 2. 最小 eta## 1. 目ie
+
+�
+定义  `re## 2. 最小 Sc
+-
+```yaml
+task_id: `
+-taartifasummary: strin- languagefa
+
+�ed`
+�
+定�fai ## 2. 最. ```yaml
+t `event_idtask_i � summary: strinpame  - path: T 使用统一时间格式
+- `pa``rt```yaml
+tastitask_iom  - �
+- 事�tastitask_HO  - patla    action: crenn
+
+  - tnnartifacts:
+  - ty p  - ty �  - tnnar��  - ty p  - type Nrisks:
+#   - ty p  - ty �   - severity: hiodrisks:
+  - �  - s s  - seve�免不  - �  - s s  - severint 
+## 3put:
+```
+
+## 3. 规则
+]
+
+#'"
+#'EOSch```
+
+##`y
+#l
+-]
+
+#'"
+#'EOng
+  action: create | update | delete
+  summary: string
+  content: string | null
+```
+
+## 3. 规则
+
+- `path` MUST 为仓库内可定位路径
+- `action` 仅允许 `create|update|delete`
+- `summary` MUST 用于前端 Diff 卡片展示
+- `content` 在 `delete` 场景 MAY 为空
+
+## 4. 非目标
+
+- Stage 6 不强制统一完整 unified diff 文本格式
+- Stage 6 先保证文件级结构化变更稳定
+EOF
+
+cat > docs/specs/contracts/artifact-card-v2-spec.md <<'"'"'EOF'"'"'
+# Artifact Card V2 Spec
+
+## 1. 目标
+
+定义 Stage 6 真实 Artifact 卡片协议，解决前后端字段不一致与多版本信息缺失的问题。
+
+## 2. 最小 Schema
+
+```yaml
+title: string
+type: preview | diff | file | review | bundle
+files:
+  - path: string
+    action: create | update | delete
+summary: string
+download_url: string | null
+version: string
+```
+
+## 3. 规则
+
+- 所有卡片 MUST 有 `title`
+- `type` MUST 可枚举
+- `files` SHOULD 用于前端列表展示
+- `download_url` 对可下载卡片 MUST 存在
+- `version` MUST 来自 Artifact 版本号
+
+## 4. 兼容性
+
+此文档作为 `artifact-card-schema-spec.md` 的 Stage 6 补充版本，用于真实产物场景。
+EOF
+
+cat > docs/specs/rules/runtime/agent-execution-rules.md <<'"'"'EOF'"'"'
+# Purpose
+
+定义 Stage 6 Runtime 的 Agent 执行顺序、角色边界与禁止行为。
+
+# Scope
+
+适用于 Planner、Coding、Review、Artifact 以及调用这些角色的 Runtime 实现。
+
+# Rules
+
+1. 系统在 Stage 6 MUST 使用 `linear_pipeline` 执行顺序。
+2. Planner MUST 先于 Coding 执行。
+3. Coding MUST 先于 Review 执行。
+4. Review MUST 先于 Artifact 执行。
+5. Agent MUST NOT 跳过前置阶段直接执行后续阶段。
+6. Review MUST NOT 修改业务代码。
+7. Artifact MUST NOT 参与代码评审。
+8. Planner MUST 输出结构化 `Task Plan` 后，Coding 才能开始。
+9. 任一阶段失败后，后续阶段 MUST NOT 自动继续。
+10. 高风险 Review MAY 触发人工审批门控。
+
+# Forbidden Actions
+
+- Coding 直接绕过 Planner 生成最终产物。
+- Review 直接改代码后再自我通过。
+- Artifact 直接判定代码质量或风险等级。
+EOF
+
+cat > docs/specs/rules/runtime/event-rules.md <<'"'"'EOF'"'"'
+# Purpose
+
+定义 Stage 6 Runtime 的事件顺序、终止语义与回放约束。
+
+# Scope
+
+适用于 Runtime 事件发射、Gateway 事件转发、WebSocket 推送、Replay 存储与 Metrics 消费。
+
+# Rules
+
+1. 每个阶段的 `started` 事件 MUST 先于对应的 `completed` 或 `failed` 事件。
+2. 同一阶段 MUST NOT 同时发出 `completed` 与 `failed`。
+3. `task.completed` 与 `task.failed` MUST 作为任务终结事件。
+4. 阶段 `failed` 事件出现后，当前阶段 MUST 终止。
+5. 任务终结后，后续业务阶段事件 MUST NOT 再继续发出。
+6. Approval、Retry、Fallback 相关事件 SHOULD 复用统一事件包络。
+7. 所有事件 MUST 可被 Replay 与 Metrics 复用。
+EOF
+
+cat > docs/specs/rules/runtime/llm-output-rules.md <<'"'"'EOF'"'"'
+# Purpose
+
+定义 Stage 6 中 LLM 输出进入 Runtime 前的校验与回退规则。
+
+# Scope
+
+适用于 Planner、Coding 及其他直接消费模型结构化输出的运行时模块。
+
+# Rules
+
+1. LLM 输出 MUST 通过 schema 校验后才能进入后续执行。
+2. 校验失败时，Runtime MUST 触发 retry 或 fallback。
+3. Runtime MUST NOT 直接消费裸文本作为结构化执行结果。
+4. LLM 输出 SHOULD 为可解析 JSON 或等价结构化对象。
+5. 输出中的必填字段缺失时，系统 MUST 视为校验失败。
+6. 校验失败原因 SHOULD 作为结构化错误或事件记录。
+
+# Forbidden Actions
+
+- 直接把自由文本当作 `Task Plan`。
+- 直接把未校验的模型输出当作 `changes` 或 `issues`。
+EOF'

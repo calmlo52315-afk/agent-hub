@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "kind": "permission",
+  "policy_id": "permission.default.v1",
+  "description": "Repository I/O boundaries and dangerous-operation denylists for AgentHub MVP.",
+  "rules": {
+    "filesystem": {
+      "repo_root_only": true,
+      "deny_paths": [
+        ".git/**",
+        ".trae/**",
+        "runtime/**",
+        "spec/**",
+        "rules/**"
+      ],
+      "deny_operations": [
+        {
+          "op": "delete",
+          "paths": ["**/*.md", "**/*.json"],
+          "reason": "MVP forbids deleting specification/rules documents by agents."
+        }
+      ],
+      "allow_operations": [
+        {
+          "op": "read",
+          "paths": ["**/*"]
+        },
+        {
+          "op": "write",
+          "paths": ["**/*"],
+          "constraints": {
+            "must_pass_ownership_lock": true
+          }
+        }
+      ]
+    },
+    "dangerous_operations": {
+      "deny_shell": true,
+      "deny_network": true,
+      "deny_secret_logging": true
+    },
+    "artifact": {
+      "artifact_root": "artifacts",
+      "artifact_write_allowed_roles": ["artifact"]
+    },
+    "skills": {
+      "enabled": true,
+      "allowed_skills": [
+        "coding.generate_patch",
+        "review.analyze_changes",
+        "artifact.package_result",
+        "claude_code",
+        "claude_review",
+        "codex_coding",
+        "codex_review"
+      ],
+      "role_skill_whitelist": {
+        "coding": ["coding.generate_patch", "claude_code", "codex_coding"],
+        "review": ["review.analyze_changes", "claude_review", "codex_review"],
+        "artifact": ["artifact.package_result"]
+      },
+      "deny_dangerous_operations": ["shell", "network", "secret_logging"]
+    }
+  }
+}

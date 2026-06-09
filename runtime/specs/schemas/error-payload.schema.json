@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agenthub.runtime.error-payload",
+  "title": "Error Payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "category",
+    "error_code",
+    "message",
+    "stage",
+    "retryable",
+    "attempts",
+    "retry_limit",
+    "details"
+  ],
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": [
+        "schema_invalid",
+        "review_failed",
+        "timeout",
+        "permission_denied",
+        "unknown",
+        "ownership_conflict",
+        "model_error",
+        "system_error"
+      ]
+    },
+    "error_code": {
+      "type": "string",
+      "enum": [
+        "SYSTEM_ERROR",
+        "MODEL_ERROR",
+        "VALIDATION_ERROR",
+        "TIMEOUT_ERROR",
+        "PERMISSION_ERROR",
+        "OWNERSHIP_ERROR",
+        "REVIEW_REJECTED",
+        "UNKNOWN_ERROR"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "retry_limit": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "exception_type": {
+      "type": ["string", "null"]
+    },
+    "details": {
+      "type": "object"
+    }
+  }
+}

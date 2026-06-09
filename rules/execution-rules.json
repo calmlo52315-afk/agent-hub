@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "kind": "execution",
+  "policy_id": "execution.default.v1",
+  "description": "Workflow state machine, retries, timeouts, and failure semantics for AgentHub MVP.",
+  "rules": {
+    "workflow": {
+      "states": [
+        "created",
+        "coding",
+        "reviewing",
+        "artifacting",
+        "done",
+        "failed"
+      ],
+      "transitions": [
+        { "from": "created", "to": "coding", "on": "start" },
+        { "from": "coding", "to": "reviewing", "on": "coding.success" },
+        { "from": "coding", "to": "failed", "on": "coding.failed" },
+        { "from": "reviewing", "to": "artifacting", "on": "review.pass" },
+        { "from": "reviewing", "to": "coding", "on": "review.fail.retry" },
+        { "from": "reviewing", "to": "failed", "on": "review.fail.hard" },
+        { "from": "artifacting", "to": "done", "on": "artifact.success" },
+        { "from": "artifacting", "to": "failed", "on": "artifact.failed" }
+      ],
+      "terminal_states": ["done", "failed"]
+    },
+    "timeouts": {
+      "coding_seconds": 600,
+      "review_seconds": 300,
+      "artifact_seconds": 300
+    },
+    "retry": {
+      "max_attempts": 2,
+      "backoff_seconds": [1, 3],
+      "retryable_error_codes": [
+        "TRANSIENT_IO",
+        "MODEL_OVERLOADED",
+        "VALIDATION_TEMPORARY"
+      ]
+    },
+    "skills": {
+      "default_timeout_seconds": 300,
+      "skill_timeouts": {
+        "coding.generate_patch": 600,
+        "review.analyze_changes": 300,
+        "artifact.package_result": 300,
+        "claude_code": 180,
+        "claude_review": 300,
+        "codex_coding": 180,
+        "codex_review": 180
+      },
+      "cost_budget": {
+        "max_tokens": 50000,
+        "max_cost_usd": 5.0
+      },
+      "process_pool": {
+        "enabled": true,
+        "max_idle_seconds": 300,
+        "max_processes_per_type": 3
+      },
+      "batch_merge": {
+        "enabled": true,
+        "window_seconds": 2.0,
+        "max_batch_size": 5
+      }
+    },
+    "failure_semantics": {
+      "on_failed": "stop_workflow",
+      "produce_error_artifact": true
+    }
+  }
+}

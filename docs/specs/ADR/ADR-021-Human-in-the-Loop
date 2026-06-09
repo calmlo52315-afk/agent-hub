@@ -1,0 +1,112 @@
+# ADR-021 Human-in-the-Loop
+
+## Decision
+
+Critical decisions require explicit human confirmation.
+
+AI assists execution.
+
+Humans retain final authority.
+
+---
+
+## Background
+
+The system is designed as a Human-in-the-Loop platform.
+
+AI should not autonomously modify critical system state.
+
+---
+
+## HITL Checkpoints
+
+### Retry Exceeded
+
+Condition:
+
+Retry count exceeds limit.
+
+Action:
+
+Require human confirmation.
+
+---
+
+### Ownership Conflict
+
+Condition:
+
+File ownership violation detected.
+
+Action:
+
+Require human confirmation.
+
+---
+
+### Review Failure
+
+Condition:
+
+Review Agent reports high-risk issues.
+
+Action:
+
+Require human confirmation.
+
+---
+
+### Large File Modification
+
+Condition:
+
+Modification exceeds configured threshold.
+
+Action:
+
+Require human confirmation.
+
+---
+
+## Approval Model
+
+Pending Approval
+
+↓
+
+Human Review
+
+↓
+
+Approve / Reject
+
+---
+
+## Constraints
+
+- AI cannot self-approve.
+- Approval decisions must be logged.
+- Approval history must be replayable.
+
+---
+
+## Audit Requirements
+
+Record:
+
+- approver
+- timestamp
+- decision
+- reason
+
+All approval records must be stored.
+
+---
+
+## Future Evolution
+
+Future versions may support:
+
+- Multi-level approval
+- Team approval workflows
+- Policy-based approval routing

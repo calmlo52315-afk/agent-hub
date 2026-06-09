@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+
+# Python
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+runtime/venv
+runtime/.venv
+
+# Node
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+build
+
+# IDE
+.vscode
+.idea
+.trae
+.claude
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# AgentHub specific
+artifacts
+gateway/data
+demo_workspace
+workspaces
+workspace
+*.log
+*.db
+*.sqlite
+.env
+.env.local
+.env.production

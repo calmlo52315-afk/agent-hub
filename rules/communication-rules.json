@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "kind": "communication",
+  "policy_id": "communication.default.v1",
+  "description": "Orchestrator-only routing and shared-state access rules for AgentHub MVP.",
+  "rules": {
+    "routing": {
+      "orchestrator_required": true,
+      "deny_direct_agent_to_agent": true,
+      "allowed_receivers": ["orchestrator"]
+    },
+    "shared_state": {
+      "read_via_orchestrator_only": true,
+      "state_keys": ["locks", "ownership", "workflow_state", "artifacts"]
+    },
+    "message_constraints": {
+      "require_envelope": true,
+      "envelope_schema_version": "1.0",
+      "max_payload_bytes": 262144
+    }
+  }
+}
+

@@ -1,0 +1,55 @@
+# ── IDE & AI Tools ──────────────────────────────────────────
+.claude/
+.trae/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Node / Next.js ──────────────────────────────────────────
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+dist/
+build/
+*.tsbuildinfo
+
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+*.egg
+
+# ── Go ──────────────────────────────────────────────────────
+gateway/gateway-server
+gateway/data/
+
+# ── OS ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Environment ─────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.*.local
+
+# ── AgentHub Runtime ────────────────────────────────────────
+workspaces/
+workspace/
+*.log
+*.db
+*.sqlite
+artifacts/
+demo_workspace/
+gateway/data/
+
+# ── Docker ──────────────────────────────────────────────────
+# (Dockerfiles 和 docker-compose.yml 正常提交)

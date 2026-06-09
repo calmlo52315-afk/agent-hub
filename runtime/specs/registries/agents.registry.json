@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "kind": "agent-registry",
+  "description": "Minimal runtime agent registry aligned with the orchestrated workflow.",
+  "agents": {
+    "coding": {
+      "id": "coding",
+      "role": "coding",
+      "input_kind": "task",
+      "output_kind": "result",
+      "workflow_stage": "coding",
+      "allowed_statuses": ["pending", "running", "success", "failed"],
+      "allowed_skills": ["coding.generate_patch@1.0.0", "claude_code@1.0.0"]
+    },
+    "review": {
+      "id": "review",
+      "role": "review",
+      "input_kind": "task",
+      "output_kind": "result",
+      "workflow_stage": "review",
+      "allowed_statuses": ["pending", "running", "success", "failed"],
+      "allowed_skills": ["review.analyze_changes@1.0.0", "claude_review@1.0.0", "codex_review@1.0.0"]
+    },
+    "artifact": {
+      "id": "artifact",
+      "role": "artifact",
+      "input_kind": "task",
+      "output_kind": "result",
+      "workflow_stage": "artifact",
+      "allowed_statuses": ["pending", "running", "success", "failed"],
+      "allowed_skills": ["artifact.package_result@1.0.0"]
+    },
+    "testing": {
+      "id": "testing",
+      "role": "testing",
+      "input_kind": "task",
+      "output_kind": "result",
+      "workflow_stage": "testing",
+      "allowed_statuses": ["pending", "running", "success", "failed"],
+      "allowed_skills": ["testing.generate_tests@1.0.0", "claude_code@1.0.0"]
+    },
+    "documentation": {
+      "id": "documentation",
+      "role": "documentation",
+      "input_kind": "task",
+      "output_kind": "result",
+      "workflow_stage": "documentation",
+      "allowed_statuses": ["pending", "running", "success", "failed"],
+      "allowed_skills": ["documentation.generate_docs@1.0.0", "claude_code@1.0.0"]
+    }
+  }
+}

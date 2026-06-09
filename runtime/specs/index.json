@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "kind": "spec-index",
+  "description": "AgentHub runtime schema index and minimal registries for machine-readable loading.",
+  "message_envelope": {
+    "schema_version": "1.0",
+    "schema_ref": "schemas/message-envelope.schema.json"
+  },
+  "schemas": {
+    "message_envelope": {
+      "path": "schemas/message-envelope.schema.json",
+      "schema_version": "1.0"
+    },
+    "task_state_machine": {
+      "path": "schemas/task-state-machine.schema.json",
+      "schema_version": "1.0"
+    },
+    "skill_invocation": {
+      "path": "schemas/skill-invocation.schema.json",
+      "schema_version": "1.0"
+    },
+    "skill_result": {
+      "path": "schemas/skill-result.schema.json",
+      "schema_version": "1.0"
+    },
+    "error_payload": {
+      "path": "schemas/error-payload.schema.json",
+      "schema_version": "1.0"
+    }
+  },
+  "registries": {
+    "agents": {
+      "path": "registries/agents.registry.json",
+      "kind": "agent-registry"
+    },
+    "skills": {
+      "path": "registries/skills.registry.json",
+      "kind": "skill-registry"
+    }
+  },
+  "agents": {
+    "coding": {
+      "id": "coding",
+      "role": "coding",
+      "input_kind": "task",
+      "output_kind": "result",
+      "registry_ref": "registries/agents.registry.json#/agents/coding"
+    },
+    "review": {
+      "id": "review",
+      "role": "review",
+      "input_kind": "task",
+      "output_kind": "result",
+      "registry_ref": "registries/agents.registry.json#/agents/review"
+    },
+    "artifact": {
+      "id": "artifact",
+      "role": "artifact",
+      "input_kind": "task",
+      "output_kind": "result",
+      "registry_ref": "registries/agents.registry.json#/agents/artifact"
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agenthub.runtime.message-envelope",
+  "title": "Message Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "message_id",
+    "task_id",
+    "trace_id",
+    "timestamp",
+    "sender",
+    "receiver",
+    "kind",
+    "status",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sender": {
+      "$ref": "#/$defs/party"
+    },
+    "receiver": {
+      "$ref": "#/$defs/party"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["task", "command", "event", "result", "error"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "running", "success", "failed"]
+    },
+    "in_reply_to": {
+      "type": ["string", "null"]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "party": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["orchestrator", "agent", "workflow"]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

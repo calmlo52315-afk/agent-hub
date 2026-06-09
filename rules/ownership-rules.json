@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "kind": "ownership",
+  "policy_id": "ownership.default.v1",
+  "description": "Owner mapping, locking/serialization, and minimal merge strategy for AgentHub MVP.",
+  "rules": {
+    "owners": [
+      {
+        "glob": "artifacts/**",
+        "owner": "artifact",
+        "write_roles": ["artifact"]
+      },
+      {
+        "glob": "spec/**",
+        "owner": "orchestrator",
+        "write_roles": ["orchestrator"]
+      },
+      {
+        "glob": "rules/**",
+        "owner": "orchestrator",
+        "write_roles": ["orchestrator"]
+      },
+      {
+        "glob": "runtime/**",
+        "owner": "orchestrator",
+        "write_roles": ["orchestrator"]
+      },
+      {
+        "glob": "**/*",
+        "owner": "coding",
+        "write_roles": ["coding"]
+      }
+    ],
+    "locking": {
+      "mode": "per_file_write_lock",
+      "required_for_ops": ["write", "delete"],
+      "default_timeout_seconds": 30
+    },
+    "version_check": {
+      "enabled": true,
+      "strategy": "sha256",
+      "on_mismatch": "fail_with_error"
+    },
+    "minimal_merge": {
+      "enabled": true,
+      "policy": "reject_if_base_changed",
+      "allowed_actions": ["create", "update"]
+    }
+  }
+}

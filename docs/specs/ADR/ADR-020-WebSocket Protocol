@@ -1,0 +1,111 @@
+# ADR-020 WebSocket Protocol
+
+## Decision
+
+Frontend and Gateway communicate through WebSocket.
+
+All realtime updates use a unified event envelope.
+
+---
+
+## Event Envelope
+
+{
+  "event_id": "string",
+  "session_id": "string",
+  "task_id": "string",
+  "type": "string",
+  "timestamp": "string",
+  "payload": {}
+}
+
+---
+
+## Event Types
+
+chat.message
+
+task.created
+
+task.updated
+
+task.completed
+
+review.completed
+
+artifact.created
+
+system.error
+
+heartbeat
+
+---
+
+## Event Definitions
+
+### chat.message
+
+Used for:
+
+- user message
+- agent message
+
+---
+
+### task.created
+
+Task enters system.
+
+---
+
+### task.updated
+
+Task state changes.
+
+---
+
+### task.completed
+
+Task reaches terminal state.
+
+---
+
+### review.completed
+
+Review Agent finished.
+
+---
+
+### artifact.created
+
+Artifact Agent produced output.
+
+---
+
+### system.error
+
+Runtime or Gateway error.
+
+---
+
+### heartbeat
+
+Connection health check.
+
+---
+
+## Constraints
+
+- All realtime events MUST use the envelope.
+- Raw strings are forbidden.
+- Event ordering is managed by timestamp.
+
+---
+
+## Future Evolution
+
+Future versions may add:
+
+- Event replay
+- Event persistence
+- Multi-client synchronization

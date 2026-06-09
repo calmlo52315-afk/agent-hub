@@ -1,0 +1,26 @@
+# 第六阶段验收清单
+
+- [ ] Runtime 不再默认写死 `demo_workspace/hello.txt`
+- [ ] 系统已明确采用 `linear_pipeline` 作为 MVP 执行模型
+- [ ] 文档中已定义未来 `dag` 演进路径
+- [ ] Planner / Coding / Review / Artifact 的职责边界清晰
+- [ ] Planner 已具备 `llm_planner` 主路径与 `rule_planner` fallback
+- [ ] 已补齐 `ADR-024` 到 `ADR-028`
+- [ ] 已补齐 Stage 6 `README/tests/modifications`
+- [ ] 已补齐 `task-plan-spec.md`
+- [ ] 已补齐 `agent-execution-spec.md`
+- [ ] 已补齐 `event-spec.md`
+- [ ] 已补齐 `diff-spec.md`
+- [ ] 已补齐 `artifact-card-v2-spec.md`
+- [ ] 已补齐 `runtime/agent-execution-rules.md`
+- [ ] 已补齐 `runtime/event-rules.md`
+- [ ] 已补齐 `runtime/llm-output-rules.md`
+- [ ] 前端可看到 `planning -> coding -> review -> artifact` 阶段变化
+- [ ] Diff 卡片展示真实改动文件与摘要
+- [ ] Artifact 卡片可定位真实产物目录并显示版本
+- [ ] 高风险 Review 结果可触发 Human Approval
+- [ ] 已沉淀 `docs/demo-cases/stage-6/` 比赛案例目录
+- [ ] `Go Gin API` 演示案例可稳定跑通
+- [ ] `React Todo 页面` 演示案例可稳定跑通
+- [ ] `修改已有代码新增接口` 演示案例可稳定跑通
+- [ ] 仓库中能找到本次任务实际生成或修改的文件

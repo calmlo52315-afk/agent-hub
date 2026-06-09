@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "kind": "rules-index",
+  "description": "AgentHub MVP ruleset index",
+  "policies": {
+    "execution": "./execution-rules.json",
+    "permission": "./permission-rules.json",
+    "ownership": "./ownership-rules.json",
+    "communication": "./communication-rules.json"
+  }
+}
+

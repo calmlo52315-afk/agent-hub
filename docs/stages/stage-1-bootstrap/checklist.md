@@ -1,0 +1,6 @@
+- [Y] 规则输入可加载：运行时能从 `/rules/index.json` 加载四类 policy，并能通过校验入口输出 policy_id
+- [Y] 运行时可启动：提供明确入口（demo/smoke_test）用于比赛现场演示
+- [Y] 能跑一个 task：demo workflow 串行走完（coding -> review -> artifact）
+- [x] 不崩：规则/协议/锁/版本等失败路径均为可诊断失败，不发生进程崩溃
+- [x] 不冲突：同文件串行写入 + base_hash 版本检查，避免旧上下文覆盖与并行写冲突
+- [x] 能输出 artifact：生成 artifacts/<task_id>/metadata.json 与 workspace snapshot，可用于回放与审计
