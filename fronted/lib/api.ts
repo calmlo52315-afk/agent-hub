@@ -74,7 +74,12 @@ async function request<T>(
   if (envelope.error) {
     throw new Error(envelope.error.message);
   }
-  return envelope.data as T;
+  // normalize null items → []（Go 的 nil slice JSON 序列化为 null）
+  const raw: any = envelope.data;
+  if (raw && raw.items === null) {
+    raw.items = [];
+  }
+  return raw as T;
 }
 
 // ============================================================
