@@ -37,7 +37,7 @@ async function request<T>(
   const url = `${baseUrl}${path}`;
   
   // Build headers - always add Authorization header since Gateway requires it
-  const headers: Record<string, string> = {
+  const headers = {
     "Content-Type": "application/json",
     ...options.headers,
     "Authorization": `Bearer ${TOKEN}`,
