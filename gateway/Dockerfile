@@ -18,7 +18,10 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY --from=builder /out/gateway-server /app/gateway-server
-COPY gateway/data /app/data
+
+# gateway/data 在 .gitignore 中且运行时自动创建，不需要 COPY
+# 如果 data 目录存在则创建空目录
+RUN mkdir -p /app/data
 
 # 创建非 root 用户
 RUN addgroup --system --gid 1001 gateway && \

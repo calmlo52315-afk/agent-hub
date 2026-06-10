@@ -31,6 +31,7 @@ docker compose up -d
 | Fronted | 3000 | Next.js 16 + TypeScript + TailwindCSS |
 | Gateway | 8080 | Go + Gin + WebSocket |
 | Runtime | 8001 | Python FastAPI + LLM Client |
+| Postgres | 5432 | PostgreSQL 16 (数据持久化)
 
 ## ⚙️ 环境变量
 
