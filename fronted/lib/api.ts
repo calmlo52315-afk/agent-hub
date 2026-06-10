@@ -309,8 +309,10 @@ export interface AgentCreateRequest {
 }
 
 export async function listAgents(): Promise<AgentDefinition[]> {
-  const res = await request<{ agents: AgentDefinition[] }>("/api/v1/agents");
-  return res.agents;
+  const res = await request<{ agents?: AgentDefinition[]; items?: AgentDefinition[] }>("/api/v1/agents");
+  // Gateway API 返回 { data: { items: [...] } }，兼容两种格式
+  const list = res.agents || res.items || [];
+  return list;
 }
 
 export async function createAgent(
