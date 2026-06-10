@@ -44,17 +44,25 @@ Respond with a JSON object:
 - `score` is 0-100; deduct 10-20 for high, 5-10 for medium, 1-3 for low issues
 - `pass` is true if no high-severity issues exist
 - If the code is correct and clean, return `pass: true, score: 95+, issues: []`
+- ⭐ Review ALL files together in one pass — be FAST, aim for under 10 seconds
+- ⭐ Limit suggestions to at most 3; focus only on the most important findings
 """
 
 
-def _build_review_prompt(path: str, content: str, instruction: str) -> str:
-    """Build the review prompt for a single changed file."""
-    return (
-        f"## File: {path}\n"
-        f"## Task Instruction: {instruction}\n\n"
-        f"```\n{content[:4000]}\n```\n\n"
-        "Review this code change. Output ONLY the JSON."
-    )
+def _build_multi_file_review_prompt(files: list[dict[str, str]], instruction: str) -> str:
+    """Build a combined review prompt for all changed files."""
+    parts = [
+        f"## Task: {instruction}",
+        "",
+        "## Files to Review:",
+    ]
+    for i, f in enumerate(files, 1):
+        parts.append(f"\n### {i}. {f['path']}\n```")
+        # 每文件最多 3000 字符
+        parts.append(f['content'][:3000])
+        parts.append("```")
+    parts.append("\nReview ALL files together. Output ONLY the JSON. Be concise, at most 3 suggestions total.")
+    return "\n".join(parts)
 
 
 @dataclass(frozen=True)
@@ -68,29 +76,42 @@ class ReviewAgent:
     agent_id: str = "review"
     role: str = "review"
 
-    def _call_llm_review(self, path: str, content: str, instruction: str) -> dict[str, Any]:
-        """Call LLM to review a single file change."""
+    def _call_llm_review(self, files: list[dict[str, str]], instruction: str) -> dict[str, Any]:
+        """⭐ 一次 LLM 调用审查所有文件（批量快速审查）。"""
+        import sys as _sys
+        import time as _time
         try:
             from runtime.llm.client import LLMClient
             client = LLMClient.from_env(model_env_key="CODING_MODEL")
-            logger.info(f"[ReviewAgent] Calling LLM to review: {path}")
+            msg = f"[ReviewAgent] Calling LLM to review {len(files)} files in ONE call"
+            logger.info(msg)
+            _sys.stderr.write(msg + "\n")
+            _sys.stderr.flush()
 
             messages = [
                 {"role": "system", "content": REVIEW_SYSTEM_PROMPT},
-                {"role": "user", "content": _build_review_prompt(path, content, instruction)},
+                {"role": "user", "content": _build_multi_file_review_prompt(files, instruction)},
             ]
 
-            response = client.chat(messages=messages, temperature=0.2, max_tokens=2048)
+            # ⭐ 快速调用
+            t0 = _time.perf_counter()
+            response = client.chat(messages=messages, temperature=0.1, max_tokens=1024)
             raw = client.extract_content(response)
+            latency_ms = int((_time.perf_counter() - t0) * 1000)
+            msg2 = f"[ReviewAgent] LLM review DONE: latency={latency_ms}ms, raw_len={len(raw)}"
+            logger.info(msg2)
+            _sys.stderr.write(msg2 + "\n")
+            _sys.stderr.flush()
 
-            # Parse JSON from response
             parsed = self._parse_json(raw)
             if parsed and isinstance(parsed, dict):
                 return parsed
         except Exception as e:
-            logger.error(f"[ReviewAgent] LLM review failed for {path}: {e}")
+            msg3 = f"[ReviewAgent] LLM review FAILED: {e}"
+            logger.error(msg3)
+            _sys.stderr.write(msg3 + "\n")
+            _sys.stderr.flush()
 
-        # Fallback: pass with no issues
         return {"pass": True, "score": 100, "issues": [], "summary": "LLM review unavailable"}
 
     def _parse_json(self, text: str) -> Any:
@@ -133,6 +154,9 @@ class ReviewAgent:
         total_score = 100
         files_reviewed = 0
 
+        # ⭐ 收集所有有内容的文件，然后一次性发给 LLM
+        files_to_review: list[dict[str, str]] = []
+
         if isinstance(applied, list) and applied:
             for ch in applied:
                 if not isinstance(ch, dict):
@@ -141,25 +165,40 @@ class ReviewAgent:
                 if not path:
                     continue
 
-                # Get file content — from content_samples or the change itself
+                # Get file content
                 content = content_samples.get(path) or ch.get("content") or ""
                 if not content:
-                    # Skip files without content (e.g., delete actions)
+                    try:
+                        from pathlib import Path
+                        repo_root = Path(__file__).resolve().parents[2]
+                        candidates = [
+                            repo_root / "workspace" / (ctx.shared_state.get("task_id", "")) / "source" / path,
+                            repo_root / path,
+                        ]
+                        for candidate in candidates:
+                            if candidate.exists() and candidate.is_file():
+                                content = candidate.read_text(encoding="utf-8")
+                                break
+                    except Exception:
+                        pass
+                if not content:
                     continue
 
-                # ⭐ LLM-based review for each file
-                result = self._call_llm_review(path, content, instruction)
-                file_issues = result.get("issues") or []
-                file_score = result.get("score", 100)
+                files_to_review.append({"path": path, "content": content})
 
-                # Attach path to issues if missing
-                for issue in file_issues:
-                    if not issue.get("path"):
-                        issue["path"] = path
+        # ⭐ 一次性批量审查所有文件
+        if files_to_review:
+            result = self._call_llm_review(files_to_review, instruction)
+            file_issues = result.get("issues") or []
+            file_score = result.get("score", 100)
 
-                all_issues.extend(file_issues)
-                total_score = min(total_score, file_score)
-                files_reviewed += 1
+            for issue in file_issues:
+                if not issue.get("path"):
+                    issue["path"] = files_to_review[0]["path"]
+
+            all_issues.extend(file_issues)
+            total_score = file_score
+            files_reviewed = len(files_to_review)
 
         # Also do a quick forbidden path check (security baseline)
         if isinstance(applied, list):

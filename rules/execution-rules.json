@@ -47,7 +47,7 @@
         "artifact.package_result": 300,
         "claude_code": 180,
         "claude_review": 300,
-        "codex_coding": 180,
+        "codex_coding": 300,
         "codex_review": 180
       },
       "cost_budget": {

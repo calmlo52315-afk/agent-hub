@@ -1251,7 +1251,7 @@ class Orchestrator:
                     )
 
  
-    def run_task(self, *, instruction: str, mentioned_agent: str | None = None, _shared_diag: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    def run_task(self, *, instruction: str, mentioned_agent: str | None = None, review_agent: str | None = None, _shared_diag: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Run the Stage 6 linear pipeline with structured planning output.
 
         If *_shared_diag* is provided it MUST be a mutable list — every event
@@ -1259,7 +1259,7 @@ class Orchestrator:
         shared list so that an external poller (e.g. the Runtime API) can
         read the intermediate progress without waiting for the task to finish.
         """
-        print(f"[TRACE] [Orchestrator] run_task START: instruction='{instruction[:80]}...', mentioned_agent={mentioned_agent}", flush=True)
+        print(f"[TRACE] [Orchestrator] run_task START: instruction='{instruction[:80]}...', mentioned_agent={mentioned_agent}, review_agent={review_agent}", flush=True)
 
         task_id = uuid.uuid4().hex
         trace_id = new_trace_id()
@@ -1339,6 +1339,9 @@ class Orchestrator:
             # 选择编码技能：如果用户指定了 agent，则使用对应的技能
             # ⭐ Stage 10: 默认使用 SkillRouter 分流
             coding_skill_name = "codex_coding"  # 默认 Codex（最快路径）
+            # ⭐ SkillRouter 在 coding 分支之外也定义好，避免 UnboundLocalError
+            from runtime.core.skill_router import SkillRouter
+            skill_router = SkillRouter()
             if mentioned_agent == "claude_code":
                 coding_skill_name = "claude_code"
             elif mentioned_agent == "codex":
@@ -1353,8 +1356,6 @@ class Orchestrator:
                     coding_skill_name = "coding.generate_patch"
             else:
                 # ⭐ 无用户指定时用 SkillRouter 自动选择
-                from runtime.core.skill_router import SkillRouter
-                skill_router = SkillRouter()
                 coding_decision = skill_router.select_coding_skill(plan)
                 coding_skill_name = coding_decision.skill_name
                 print(f"[TRACE] [Orchestrator] SkillRouter coding decision: {coding_skill_name} — {coding_decision.reason}", flush=True)
@@ -1529,13 +1530,22 @@ class Orchestrator:
             chat_mode = plan.chat_mode if hasattr(plan, "chat_mode") else "single"
             review_required = plan.review_required if hasattr(plan, "review_required") else False  # ⭐ Stage 10: 默认跳过 review
             # ⭐ Step 5: 用户提及 review 相关 agent 时自动启用
+            # ⭐ 多 agent 场景：review_agent 优先（来自 extractReviewAgent）
             if not review_required:
-                if mentioned_agent in ("claude_review",):
+                # ⭐ review_agent 不为空意味着用户明确要求审查
+                if review_agent:
+                    review_required = True
+                elif review_agent in ("claude_review",):
+                    review_required = True
+                elif mentioned_agent in ("claude_review",):
                     review_required = True
                 elif isinstance(mentioned_agent, str) and "review" in mentioned_agent.lower():
                     review_required = True
-                # 如果 instruction 中明确包含 @review 或 @claude_review
-                elif instruction and ("@review" in instruction or "@claude_review" in instruction):
+                # 如果 instruction 中明确包含审查关键词
+                elif instruction and any(kw in instruction.lower() for kw in (
+                    "@review", "@claude_review", "@claude code",
+                    "@security_reviewer", "审查", "@qa_engineer",
+                )):
                     review_required = True
             package_strategy = plan.package_strategy if hasattr(plan, "package_strategy") else "none"
             
@@ -1602,17 +1612,22 @@ class Orchestrator:
                 # ⭐ Stage 10: 使用 SkillRouter 智能分流审查技能
                 review_decision = skill_router.select_review_skill(plan)
                 review_skill_name = review_decision.skill_name
-                print(f"[TRACE] [Orchestrator] SkillRouter review decision: {review_skill_name} — {review_decision.reason}")
+                print(f"[TRACE] [Orchestrator] SkillRouter review decision: {review_skill_name} — {review_decision.reason}", flush=True)
 
                 # 用户显式指定 agent 时优先级最高
-                if mentioned_agent == "claude_review":
+                # ⭐ review_agent 优先（来自 Gateway extractReviewAgent / 群聊多 agent 文本解析）
+                # ⭐ 只对 claude_review 做覆盖；codex 不覆盖（用内置 LLM 更快）
+                if review_agent == "claude_review":
                     review_skill_name = "claude_review"
-                elif mentioned_agent == "codex":
-                    review_skill_name = "codex_review"
+                elif mentioned_agent == "claude_review":
+                    review_skill_name = "claude_review"
+                # ⭐ 不再把 @Codex 强制映射到 codex_review — 编码用 Codex，审查用内置 LLM
                 elif agent_def is not None:
                     # User-Defined Agent：白名单检查 + 使用 claude_review
                     if AgentPromptBuilder.check_skill_allowed(agent_def, "review"):
                         review_skill_name = "claude_review"
+
+                print(f"[TRACE] [Orchestrator] Final review skill: {review_skill_name}", flush=True)
 
                 # 注入 persona 到 review payload
                 if agent_def is not None:
@@ -1677,7 +1692,9 @@ class Orchestrator:
                     ),
                     result_env=review_env,
                 )["review_result"]
-                print(f"[TRACE] [Orchestrator] Review output: pass={review_output.get('pass')}, score={review_output.get('score')}, issues={len(review_output.get('issues') or [])}", flush=True)
+                # ⭐ 注入 review_skill 名称，供 Gateway 展示用
+                review_output["review_skill"] = review_skill_name
+                print(f"[TRACE] [Orchestrator] Review output: pass={review_output.get('pass')}, score={review_output.get('score')}, issues={len(review_output.get('issues') or [])}, skill={review_skill_name}", flush=True)
                 # ── Approval gate (checked first, independent of pass/fail) ─
                 if bool(review_output.get("approval_required")):
                     self._emit_event(

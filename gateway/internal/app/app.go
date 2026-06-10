@@ -561,7 +561,8 @@ func (a *GatewayApp) handleChatMessage(client *ws.Client, event protocol.WSEvent
 	if mentionedAgent == "" {
 		mentionedAgent = extractMentionedAgent(content)
 	}
-	fmt.Printf("[DEBUG] Extracted mentionedAgent: '%s' (from payload: %v)\n", mentionedAgent, event.Payload["mentioned_agent"])
+	reviewAgent := extractReviewAgent(content)
+	fmt.Printf("[DEBUG] Extracted mentionedAgent: '%s', reviewAgent: '%s' (from payload: %v)\n", mentionedAgent, reviewAgent, event.Payload["mentioned_agent"])
 
 	task := store.Task{
 		TaskID:             newID("task"),
@@ -575,6 +576,7 @@ func (a *GatewayApp) handleChatMessage(client *ws.Client, event protocol.WSEvent
 		RetryLimit:         2,
 		WaitingForApproval: false,
 		MentionedAgent:     mentionedAgent,
+		ReviewAgent:        reviewAgent,
 		UpdatedAt:          time.Now().UTC(),
 	}
 	if err := a.Store.CreateTask(task); err != nil {
@@ -634,11 +636,24 @@ func (a *GatewayApp) handleChatMessage(client *ws.Client, event protocol.WSEvent
 
 func extractMentionedAgent(content string) string {
 	lowerContent := strings.ToLower(content)
+	// ⭐ 群聊多 agent 场景：同时提取编码和审查 agent
+	// 编码 agent 优先级：@Codex > @Claude Code
 	switch {
-	case strings.Contains(lowerContent, "@claude-code") || strings.Contains(lowerContent, "@claude code"):
-		return "claude_code"
 	case strings.Contains(lowerContent, "@codex"):
 		return "codex"
+	case strings.Contains(lowerContent, "@claude-code") || strings.Contains(lowerContent, "@claude code"):
+		return "claude_code"
+	default:
+		return ""
+	}
+}
+
+// extractReviewAgent 从消息文本中提取审查 agent
+func extractReviewAgent(content string) string {
+	lowerContent := strings.ToLower(content)
+	switch {
+	case strings.Contains(lowerContent, "@claude-code") || strings.Contains(lowerContent, "@claude code"):
+		return "claude_review"
 	default:
 		return ""
 	}
@@ -711,7 +726,7 @@ func (a *GatewayApp) executeTask(task store.Task, mentionedAgent string) {
 	}()
 
 	log.Printf("[Gateway] Submitting instruction to Runtime (session=%s)...", task.SessionID)
-	submitted, err := a.Runtime.SubmitInstruction(ctx, task.Instruction, mentionedAgent, task.SessionID)
+	submitted, err := a.Runtime.SubmitInstruction(ctx, task.Instruction, mentionedAgent, task.ReviewAgent, task.SessionID)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			latest, getErr := a.Store.GetTask(task.TaskID)
@@ -884,9 +899,9 @@ func (a *GatewayApp) executeTask(task store.Task, mentionedAgent string) {
 
 	var content string
 	if len(result.Result.UsedSkills) > 0 {
-		content = fmt.Sprintf("任务已完成。使用技能: %v。Review 结果: `pass=%v`，已生成 diff 与 artifact 卡片。", result.Result.UsedSkills, result.Result.Review.Pass)
+		content = fmt.Sprintf("✅ 任务已完成。使用技能: %v", result.Result.UsedSkills)
 	} else {
-		content = fmt.Sprintf("任务已完成。Review 结果: `pass=%v`，已生成 diff 与 artifact 卡片。", result.Result.Review.Pass)
+		content = "✅ 任务已完成。"
 	}
 	a.persistAndBroadcast(task.SessionID, a.newEvent(
 		task.SessionID,
@@ -905,6 +920,28 @@ func (a *GatewayApp) executeTask(task store.Task, mentionedAgent string) {
 			"stream_chunk": false,
 		},
 	))
+
+	// ⭐ 生成审查报告 markdown 消息
+	reviewReport := buildReviewReportMessage(result)
+	if reviewReport != "" {
+		a.persistAndBroadcast(task.SessionID, a.newEvent(
+			task.SessionID,
+			task.TaskID,
+			result.TraceID,
+			"chat.message",
+			"result",
+			"success",
+			protocol.Party{Type: "agent", ID: "review"},
+			protocol.Party{Type: "session", ID: task.SessionID},
+			map[string]any{
+				"message_id":   newID("msg"),
+				"role":         "agent",
+				"format":       "markdown",
+				"content":      reviewReport,
+				"stream_chunk": false,
+			},
+		))
+	}
 
 	task.Status = "completed"
 	task.CurrentAgent = ""
@@ -1210,6 +1247,12 @@ func buildReviewCard(task store.Task, result runtimeclient.RunResult) protocol.A
 
 	decision := map[bool]string{true: "pass", false: "fail"}[passed]
 
+	summary := fmt.Sprintf("审查完成: %s | 发现 %d 个问题 | 评分 %d/100",
+		map[bool]string{true: "✓ 通过", false: "✗ 未通过"}[passed],
+		len(reviewIssues),
+		score,
+	)
+
 	return protocol.ArtifactCard{
 		SchemaVersion: "1.0",
 		CardID:        newID("card"),
@@ -1218,7 +1261,7 @@ func buildReviewCard(task store.Task, result runtimeclient.RunResult) protocol.A
 		TaskID:        task.TaskID,
 		CardType:      "review",
 		Title:         "代码审查",
-		Summary:       fmt.Sprintf("Review: %s (%d issues, score=%d)", decision, len(reviewIssues), score),
+		Summary:       summary,
 		Status:        "ready",
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -1239,6 +1282,110 @@ func buildReviewCard(task store.Task, result runtimeclient.RunResult) protocol.A
 			"files_reviewed": review.FilesReviewed,
 		},
 	}
+}
+
+// buildReviewReportMessage 生成审查报告的 markdown 消息，包含所有 issues 详情。
+func buildReviewReportMessage(result runtimeclient.RunResult) string {
+	review := result.Result.Review
+
+	var b strings.Builder
+
+	// ⭐ 审查技能标签
+	skillLabel := review.ReviewSkill
+	if skillLabel == "" {
+		skillLabel = "内置审查 (doubao)"
+	}
+
+	if review.Skipped {
+		b.WriteString(fmt.Sprintf("## 📋 审查结果 (%s)\n\n", skillLabel))
+		b.WriteString("✅ 审查已完成 (快速模式)\n\n")
+		b.WriteString("评分: 100/100\n\n")
+		b.WriteString("> 简单任务，自动通过审查。\n")
+		return b.String()
+	}
+
+	passed := review.Pass
+	score := review.Score
+	if score == 0 {
+		score = 100 - len(review.Issues)*20
+		if score < 0 {
+			score = 0
+		}
+	}
+
+	b.WriteString(fmt.Sprintf("## 📋 审查报告 (%s)\n\n", skillLabel))
+
+	if passed {
+		b.WriteString(fmt.Sprintf("✅ **审查通过** | 评分: **%d/100** | 审查文件: %d\n\n", score, review.FilesReviewed))
+	} else {
+		b.WriteString(fmt.Sprintf("❌ **审查未通过** | 评分: **%d/100** | 审查文件: %d\n\n", score, review.FilesReviewed))
+	}
+
+	if len(review.Issues) == 0 {
+		b.WriteString("✅ 未发现任何问题。代码质量良好。\n")
+	} else {
+		b.WriteString(fmt.Sprintf("### 发现问题 (%d)\n\n", len(review.Issues)))
+
+		sevIcons := map[string]string{
+			"high":   "🔴",
+			"medium": "🟡",
+			"low":    "🟢",
+		}
+		typeLabels := map[string]string{
+			"security":    "安全",
+			"logic":       "逻辑",
+			"style":       "风格",
+			"performance": "性能",
+		}
+
+		for i, issue := range review.Issues {
+			sev := ""
+			if s, ok := issue["severity"].(string); ok {
+				sev = s
+			}
+			msg := ""
+			if m, ok := issue["message"].(string); ok {
+				msg = m
+			}
+			path := ""
+			if p, ok := issue["path"].(string); ok {
+				path = p
+			}
+			suggestion := ""
+			if s, ok := issue["suggestion"].(string); ok {
+				suggestion = s
+			}
+			issueType := ""
+			if t, ok := issue["type"].(string); ok {
+				issueType = t
+			}
+
+			icon := sevIcons[sev]
+			if icon == "" {
+				icon = "⚪"
+			}
+			typeLabel := typeLabels[issueType]
+			if typeLabel == "" {
+				typeLabel = issueType
+			}
+
+			b.WriteString(fmt.Sprintf("**%d.** %s `%s`", i+1, icon, sev))
+			if typeLabel != "" {
+				b.WriteString(fmt.Sprintf(" [%s]", typeLabel))
+			}
+			b.WriteString("\n")
+			b.WriteString(fmt.Sprintf("   > %s\n", msg))
+			if path != "" {
+				b.WriteString(fmt.Sprintf("   - 📄 `%s`\n", path))
+			}
+			if suggestion != "" {
+				b.WriteString(fmt.Sprintf("   - 💡 %s\n", suggestion))
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	return b.String()
 }
 
 func guessMimeType(path string) string {

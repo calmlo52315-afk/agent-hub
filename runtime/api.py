@@ -28,6 +28,7 @@ class RuntimeTaskRunRequest(BaseModel):
 
     instruction: str = Field(min_length=1)
     mentioned_agent: str | None = None
+    review_agent: str | None = None
     session_id: str | None = None
 
 
@@ -227,7 +228,7 @@ def create_app() -> FastAPI:
             }
         worker = threading.Thread(
             target=_execute_job,
-            args=(task_id, request.instruction, shared_diag, request.mentioned_agent, request.session_id),
+            args=(task_id, request.instruction, shared_diag, request.mentioned_agent, request.review_agent, request.session_id),
             daemon=True,
         )
         worker.start()
@@ -336,7 +337,12 @@ def create_app() -> FastAPI:
                 if entry.is_dir():
                     if entry.name.startswith("."):
                         continue
+                    # ⭐ 过滤无关的系统目录 — 用户只关心自己的代码
+                    if entry.name in ("workspace", "gateway", "artifacts", "__pycache__", "node_modules", ".git"):
+                        continue
                     children = walk_dir(entry, entry_rel)
+                    if not children:
+                        continue  # 跳过空目录
                     items.append({
                         "name": entry.name,
                         "path": entry_rel,
@@ -506,7 +512,7 @@ def require_internal_token(x_runtime_token: str = Header(default="")) -> None:
         )
 
 
-def _execute_job(task_id: str, instruction: str, shared_diag: list[dict[str, Any]] | None = None, mentioned_agent: str | None = None, session_id: str | None = None) -> None:
+def _execute_job(task_id: str, instruction: str, shared_diag: list[dict[str, Any]] | None = None, mentioned_agent: str | None = None, review_agent: str | None = None, session_id: str | None = None) -> None:
     with _jobs_lock:
         if task_id not in _jobs:
             return
@@ -516,7 +522,7 @@ def _execute_job(task_id: str, instruction: str, shared_diag: list[dict[str, Any
 
     # ⭐ Stage 10: 启动日志直接写 stderr 确保可见
     import sys as _sys
-    _sys.stderr.write(f"[RUNTIME] _execute_job START: task={task_id[:16]}..., session={session_id}, agent={mentioned_agent}\n")
+    _sys.stderr.write(f"[RUNTIME] _execute_job START: task={task_id[:16]}..., session={session_id}, agent={mentioned_agent}, review={review_agent}\n")
     _sys.stderr.flush()
 
     try:
@@ -536,7 +542,7 @@ def _execute_job(task_id: str, instruction: str, shared_diag: list[dict[str, Any
                 }
         return
     try:
-        raw = orch.run_task(instruction=instruction, mentioned_agent=mentioned_agent, _shared_diag=shared_diag)
+        raw = orch.run_task(instruction=instruction, mentioned_agent=mentioned_agent, review_agent=review_agent, _shared_diag=shared_diag)
 
         # 适配 Gateway 的 RunResult 格式
         pipeline_result = raw.get("result") or {}

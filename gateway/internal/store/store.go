@@ -156,6 +156,7 @@ type Task struct {
 	RuntimeTaskID      string    `json:"runtime_task_id,omitempty"`
 	RuntimeTraceID     string    `json:"runtime_trace_id,omitempty"`
 	MentionedAgent     string    `json:"mentioned_agent,omitempty"`
+	ReviewAgent        string    `json:"review_agent,omitempty"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 

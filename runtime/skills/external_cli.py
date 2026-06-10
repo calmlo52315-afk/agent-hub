@@ -624,6 +624,15 @@ def _build_codex_coding_prompt(payload: dict[str, Any], plan: "SkillInvocationPl
 
     parts: list[str] = [instruction]
 
+    # ⭐ 文件位置约束 — 强制 Codex 只在当前目录写文件
+    parts.append(
+        "\n## IMPORTANT: File Location Constraint\n"
+        "- ALL generated files MUST be created in the CURRENT WORKING DIRECTORY (the `source/` folder)\n"
+        "- Do NOT create nested `workspace/`, `gateway/`, `artifacts/`, or `__pycache__/` directories\n"
+        "- Do NOT create any subdirectory structure — keep all files flat in the current directory\n"
+        "- Use ONLY relative paths like `main.py`, `utils.py` (NOT `workspace/xxx/main.py`)\n"
+    )
+
     if targets:
         parts.append("\n## Target Files")
         for t in targets:

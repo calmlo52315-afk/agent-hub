@@ -103,7 +103,11 @@ class RulePlanner:
         lowered = instruction.lower()
 
         # ⭐ Stage 10: 只在用户显式要求时才开启 review
-        review_wanted = any(agent in lowered for agent in ("@review", "@claude_review", "@claude code"))
+        # ⭐ 扩展检测：@security_reviewer、审查、review 等关键词
+        review_wanted = any(agent in lowered for agent in (
+            "@review", "@claude_review", "@claude code",
+            "@security_reviewer", "审查", "review", "@qa_engineer",
+        ))
 
         if "gin" in lowered or "go" in lowered:
             plan = self._plan_go_gin_api(task_id=task_id, instruction=instruction)
@@ -298,6 +302,8 @@ class RulePlanner:
             lang, ext = "bash", "sh"
         elif any(kw in lowered for kw in ("c", "c语言")):
             lang, ext = "c", "c"
+        elif any(kw in lowered for kw in ("文档", "doc", "documentation", "markdown", "readme", "md")):
+            lang, ext = "markdown", "md"
         else:
             lang, ext = "text", "txt"
 

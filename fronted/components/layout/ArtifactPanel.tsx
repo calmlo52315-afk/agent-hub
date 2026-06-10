@@ -218,6 +218,13 @@ export function ArtifactPanel() {
   const artifacts = useArtifactStore((s) => s.artifacts);
   const tasks = useTaskStore((s) => s.tasks);
   const wsMeta = useWorkspaceStore((s) => s.meta);
+  const currentSessionId = useSessionStore((s) => s.currentSessionId);
+
+  // ⭐ 按当前 session 过滤 artifacts，防止跨会话数据泄漏
+  const sessionArtifacts = useMemo(
+    () => artifacts.filter(a => a.session_id === currentSessionId),
+    [artifacts, currentSessionId]
+  );
 
   const [activeTab, setActiveTab] = useState<TabKey>("files");
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
@@ -234,8 +241,9 @@ export function ArtifactPanel() {
   const [codePanelHeight, setCodePanelHeight] = useState(350); // 代码区默认高度 px
 
   // Build file tree from workspace files (API) or fall back to diff artifacts
+  // ⭐ 使用 session-filtered artifacts 构建文件树
   const wsFileTree = useWorkspaceStore((s) => s.fileTree);
-  const artifactFileTree = useMemo(() => buildFileTree(artifacts), [artifacts]);
+  const artifactFileTree = useMemo(() => buildFileTree(sessionArtifacts), [sessionArtifacts]);
   const fileTree = wsFileTree.length > 0 ? wsFileTree : artifactFileTree;
   const totalFileCount = useMemo(() => countFiles(fileTree), [fileTree]);
 
@@ -272,7 +280,6 @@ export function ArtifactPanel() {
   }, [fileTree]);
 
   // ⭐ session 切换时重置选中文件和展开状态
-  const currentSessionId = useSessionStore((s) => s.currentSessionId);
   useEffect(() => {
     setSelectedFile(null);
     setExpandedPaths(new Set());
@@ -314,8 +321,8 @@ export function ArtifactPanel() {
       }
     }
 
-    // 2. 然后检查 diff artifacts
-    for (const a of artifacts) {
+    // 2. 然后检查 diff artifacts（当前 session 的）
+    for (const a of sessionArtifacts) {
       if (a.card_type === "diff") {
         const c = a.content as unknown as DiffContent;
         const found = c.files?.find((f) => f.path === node.path);
@@ -354,21 +361,21 @@ export function ArtifactPanel() {
   };
   // ---- Tab: Changes ----
   const diffArtifacts = useMemo(
-    () => artifacts.filter((a) => a.card_type === "diff"),
-    [artifacts]
+    () => sessionArtifacts.filter((a) => a.card_type === "diff"),
+    [sessionArtifacts]
   );
 
   // ---- Tab: Bundles ----
   const bundleArtifacts = useMemo(
-    () => artifacts.filter((a) => a.card_type === "bundle"),
-    [artifacts]
+    () => sessionArtifacts.filter((a) => a.card_type === "bundle"),
+    [sessionArtifacts]
   );
 
   // ---- Empty state ----
   // For imported workspaces with a file tree from browser selection, show files immediately
   const hasImportedFiles = wsMeta?.workspace_type === "imported" && wsFileTree.length > 0;
 
-  if (artifacts.length === 0 && tasks.length === 0 && !hasImportedFiles) {
+  if (sessionArtifacts.length === 0 && tasks.length === 0 && !hasImportedFiles) {
     return (
       <div className="flex h-full flex-col bg-white">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB]">

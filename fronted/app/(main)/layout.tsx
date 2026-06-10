@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SessionSidebar } from "@/components/layout/SessionSidebar";
 import { ArtifactPanel } from "@/components/layout/ArtifactPanel";
 import { WorkspaceSelectionModal, type WorkspaceImportPayload } from "@/components/layout/WorkspaceSelectionModal";
@@ -197,6 +197,11 @@ export default function MainLayout() {
 
   const [pendingSessionAgentId, setPendingSessionAgentId] = useState<string | undefined>(undefined);
 
+  // ⭐ 竞态保护：每次 loadSessionDetail 调用递增，回调中检查是否仍为最新
+  const loadSeqRef = useRef(0);
+  // ⭐ 文件树轮询 interval ref
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // ---- Open workspace selection modal ----
   const handleRequestNewSession = (mode: "single_agent" | "multi_agent" = "multi_agent", agentId?: string) => {
     setPendingSessionMode(mode);
@@ -243,6 +248,10 @@ export default function MainLayout() {
   };
 
   const loadSessionDetail = async (sessionId: string) => {
+    // ⭐ 竞态保护：递增序列号，只有最新请求的结果才写入 store
+    loadSeqRef.current += 1;
+    const mySeq = loadSeqRef.current;
+
     try {
       // Try to get session detail (graceful failure)
       let sessionDetail = null;
@@ -335,6 +344,11 @@ export default function MainLayout() {
     } catch (e) {
       console.error("Failed in loadSessionDetail", e);
     }
+    // ⭐ 竞态保护：回调结束时检查，如果不是最新请求则丢弃结果
+    if (mySeq !== loadSeqRef.current) {
+      console.log(`[loadSessionDetail] Dropping stale result for session ${sessionId} (seq=${mySeq}, current=${loadSeqRef.current})`);
+      return;
+    }
   };
 
   useEffect(() => {
@@ -403,6 +417,43 @@ export default function MainLayout() {
         });
     }
   }, [sessionStore.currentSessionId]);
+
+  // ⭐ 文件树轮询：每 5 秒刷新一次（任务运行中每 3 秒）
+  const isTaskRunning = useMemo(() => {
+    return taskStore.tasks.some(
+      (t) => t.status === "running" || t.status === "planning" || t.status === "retrying"
+    );
+  }, [taskStore.tasks]);
+  useEffect(() => {
+    const sessionId = sessionStore.currentSessionId;
+    if (!sessionId) return;
+
+    const pollMs = isTaskRunning ? 3000 : 5000;
+
+    // 清理旧 interval
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+    }
+
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        // ⭐ 只在当前 session 仍活跃时刷新
+        if (useSessionStore.getState().currentSessionId !== sessionId) return;
+        const files = await getWorkspaceFiles(sessionId);
+        if (useSessionStore.getState().currentSessionId !== sessionId) return;
+        useWorkspaceStore.getState().setFileTree(files);
+      } catch {
+        // 静默忽略轮询错误
+      }
+    }, pollMs);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [sessionStore.currentSessionId, isTaskRunning]);
 
   // Check if there are any artifacts
   const hasArtifacts = artifactStore.artifacts.length > 0;

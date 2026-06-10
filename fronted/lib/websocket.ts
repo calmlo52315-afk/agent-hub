@@ -258,6 +258,8 @@ export class WebSocketManager {
   private registerDefaultHandlers(): void {
     // chat.message
     this.on("chat.message", (msg) => {
+      // ⭐ 只添加当前 session 的消息，防止跨 session 数据泄漏
+      if (msg.session_id !== this.sessionId) return;
       const chatStore = useChatStore.getState();
       chatStore.addMessage(msg);
 
@@ -274,6 +276,7 @@ export class WebSocketManager {
 
     // task.created
     this.on("task.created", (msg) => {
+      if (msg.session_id !== this.sessionId) return;
       const taskStore = useTaskStore.getState();
       const chatStore = useChatStore.getState();
       const payload = msg.payload as unknown as TaskUpdatedPayload;
@@ -292,6 +295,7 @@ export class WebSocketManager {
 
     // task.updated
     this.on("task.updated", (msg) => {
+      if (msg.session_id !== this.sessionId) return;
       const taskStore = useTaskStore.getState();
       const chatStore = useChatStore.getState();
       const payload = msg.payload as unknown as TaskUpdatedPayload;
@@ -307,6 +311,7 @@ export class WebSocketManager {
 
     // task.completed
     this.on("task.completed", (msg) => {
+      if (msg.session_id !== this.sessionId) return;
       const taskStore = useTaskStore.getState();
       const chatStore = useChatStore.getState();
       const payload = msg.payload as unknown as TaskUpdatedPayload;
@@ -322,6 +327,7 @@ export class WebSocketManager {
 
     // coding.completed
     this.on("coding.completed", (msg) => {
+      if (msg.session_id !== this.sessionId) return;
       const chatStore = useChatStore.getState();
       chatStore.addMessage(msg);
       // ⭐ Step 4: 更新 task 的编码耗时
@@ -336,12 +342,14 @@ export class WebSocketManager {
 
     // review.started
     this.on("review.started", (msg) => {
+      if (msg.session_id !== this.sessionId) return;
       const chatStore = useChatStore.getState();
       chatStore.addMessage(msg);
     });
 
     // review.completed
     this.on("review.completed", (msg) => {
+      if (msg.session_id !== this.sessionId) return;
       // Handled as a message in chat flow — also can trigger UI updates
       const chatStore = useChatStore.getState();
       chatStore.addMessage(msg);
@@ -357,6 +365,7 @@ export class WebSocketManager {
 
     // review.failed
     this.on("review.failed", (msg) => {
+      if (msg.session_id !== this.sessionId) return;
       const chatStore = useChatStore.getState();
       chatStore.addMessage(msg);
     });
@@ -367,9 +376,14 @@ export class WebSocketManager {
       const chatStore = useChatStore.getState();
       const payload = msg.payload as unknown as ArtifactCreatedPayload;
       if (payload.card) {
-        artifactStore.addArtifact(payload.card);
+        // ⭐ 只添加当前 session 的 artifact，防止跨 session 数据泄漏
+        if (payload.card.session_id === this.sessionId) {
+          artifactStore.addArtifact(payload.card);
+        }
         // 对于简单任务的单个文件，也添加到聊天消息流中
-        chatStore.addMessage(msg);
+        if (msg.session_id === this.sessionId) {
+          chatStore.addMessage(msg);
+        }
       }
     });
 

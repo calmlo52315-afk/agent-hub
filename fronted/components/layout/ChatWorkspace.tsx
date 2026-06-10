@@ -66,8 +66,10 @@ export function ChatWorkspace({ onRequestNewSession }: ChatWorkspaceProps) {
     const manager = getActiveManager();
     if (manager) {
       // ⭐ Stage 10: 单聊模式下自动传递 mentionedAgent
-      const agentId = useSessionStore.getState().currentAgentId;
-      manager.sendChatMessage(content, "user", "plain", agentId || undefined);
+      // 群聊模式下不传 mentioned_agent，让 Gateway 从消息文本中解析多 agent 引用
+      const isSingle = currentSession?.mode === "single_agent";
+      const agentId = isSingle ? useSessionStore.getState().currentAgentId : undefined;
+      manager.sendChatMessage(content, "user", "plain", agentId ?? undefined);
     }
   };
 

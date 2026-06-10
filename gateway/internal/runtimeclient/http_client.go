@@ -38,8 +38,9 @@ type ReviewPayload struct {
 	Issues         []map[string]any `json:"issues"`
 	Summary        map[string]any   `json:"summary"`
 	FilesReviewed  int              `json:"files_reviewed"`
-	Skipped        bool             `json:"skipped"`         // ⭐ review 被跳过
+	Skipped        bool             `json:"skipped"`
 	ApprovalRequired bool           `json:"approval_required"`
+	ReviewSkill    string           `json:"review_skill,omitempty"`
 }
 
 type ArtifactPayload struct {
@@ -82,7 +83,7 @@ type WorkspaceFilesContentResult struct {
 }
 
 type Client interface {
-	SubmitInstruction(ctx context.Context, instruction string, mentionedAgent string, sessionID string) (SubmittedTask, error)
+	SubmitInstruction(ctx context.Context, instruction string, mentionedAgent string, reviewAgent string, sessionID string) (SubmittedTask, error)
 	WaitForResult(ctx context.Context, submitted SubmittedTask) (RunResult, error)
 	WaitForResultWithProgress(ctx context.Context, submitted SubmittedTask, onProgress func(ProgressEvent)) (RunResult, error)
 	CancelTask(ctx context.Context, runtimeJobID string) error
@@ -96,6 +97,7 @@ type Client interface {
 type RunInstructionRequest struct {
 	Instruction    string `json:"instruction"`
 	MentionedAgent string `json:"mentioned_agent,omitempty"`
+	ReviewAgent    string `json:"review_agent,omitempty"`
 	SessionID      string `json:"session_id,omitempty"`
 }
 
@@ -139,15 +141,15 @@ func NewHTTPClient(baseURL string, token string, timeout time.Duration) *HTTPCli
 }
 
 func (c *HTTPClient) RunInstruction(ctx context.Context, instruction string, mentionedAgent string, sessionID string) (RunResult, error) {
-	submitted, err := c.SubmitInstruction(ctx, instruction, mentionedAgent, sessionID)
+	submitted, err := c.SubmitInstruction(ctx, instruction, mentionedAgent, "", sessionID)
 	if err != nil {
 		return RunResult{}, err
 	}
 	return c.WaitForResult(ctx, submitted)
 }
 
-func (c *HTTPClient) SubmitInstruction(ctx context.Context, instruction string, mentionedAgent string, sessionID string) (SubmittedTask, error) {
-	body, err := json.Marshal(RunInstructionRequest{Instruction: instruction, MentionedAgent: mentionedAgent, SessionID: sessionID})
+func (c *HTTPClient) SubmitInstruction(ctx context.Context, instruction string, mentionedAgent string, reviewAgent string, sessionID string) (SubmittedTask, error) {
+	body, err := json.Marshal(RunInstructionRequest{Instruction: instruction, MentionedAgent: mentionedAgent, ReviewAgent: reviewAgent, SessionID: sessionID})
 	if err != nil {
 		return SubmittedTask{}, fmt.Errorf("marshal runtime request: %w", err)
 	}

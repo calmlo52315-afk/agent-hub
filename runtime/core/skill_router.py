@@ -127,16 +127,17 @@ class SkillRouter:
         """
         根据 plan 选择审查技能
 
-        ⭐ Stage 10 分流策略 (角色标注):
-        - SIMPLE → review.analyze_changes (内置 LLM/doubao，轻量快速) — simple_reviewer
-        - MEDIUM/PROJECT → claude_review (Claude Code，深度审查，适合大项目) — deep_reviewer
-        - Claude 不可用 → codex_review (Codex，快速开发周期) — quick_reviewer
+        ⭐ Stage 10 分流策略 (速度优先 — 比赛场景):
+        - 默认 → review.analyze_changes (内置 LLM/doubao，轻量快速 <5s)
+        - SIMPLE/MEDIUM → review.analyze_changes (内置 LLM)
+        - ~~PROJECT → claude_review~~ (太慢，比赛不用)
+        - Claude Code 不可用 → codex_review
         - 都不可用 → review.analyze_changes (内置 LLM 兜底)
 
         设计原则:
-        - Claude Code: 适合大项目的深度审查修改，能利用 coding 阶段的完整上下文
-        - Codex: 适合快速开发出项目，速度优先
-        - Built-in LLM (doubao): 简单任务的快速审查
+        - 内置 LLM (doubao-seed-code): 快速审查，<5s 完成，适合比赛展示
+        - Codex: 适中速度，适合日常开发
+        - Claude Code: 深度慢速审查 (~60-300s)，仅在用户显式 @Claude Code review 时使用
         """
         from runtime.skills.external_cli import external_cli_available
 
@@ -144,36 +145,28 @@ class SkillRouter:
 
         print(f"[TRACE] [SkillRouter] select_review_skill: complexity={complexity}")
 
-        if complexity == TaskComplexity.SIMPLE:
-            print(f"[TRACE] [SkillRouter] -> REVIEW (simple task, built-in doubao LLM — simple_reviewer)")
+        # ⭐ 默认使用内置 LLM (doubao) — 快速、可靠、适合比赛
+        if complexity in (TaskComplexity.SIMPLE, TaskComplexity.MEDIUM):
+            print(f"[TRACE] [SkillRouter] -> REVIEW (built-in LLM doubao — fast <5s)")
             return SkillDecision(
                 skill_type=SkillType.REVIEW,
                 skill_name="review.analyze_changes",
-                reason=f"简单任务，使用内置 LLM (doubao simple_reviewer) 快速审查",
+                reason=f"{complexity} 任务，使用内置 LLM (doubao) 快速审查 — 适合比赛",
             )
 
-        # MEDIUM/PROJECT → Claude Review (深度审查，大项目)
-        if external_cli_available("claude"):
-            print(f"[TRACE] [SkillRouter] -> CLAUDE_REVIEW (deep review — deep_reviewer)")
-            return SkillDecision(
-                skill_type=SkillType.CLAUDE_REVIEW,
-                skill_name="claude_review",
-                reason=f"{complexity} 任务，使用 Claude Code (deep_reviewer) 深度审查 — 适合大项目",
-            )
-
-        # Claude 不可用 → Codex Review 备选 (快速审查)
+        # PROJECT 复杂项目 — 优先 Codex review (比 Claude Code 快很多)
         if external_cli_available("codex"):
-            print(f"[TRACE] [SkillRouter] -> CODEX_REVIEW (quick review — quick_reviewer)")
+            print(f"[TRACE] [SkillRouter] -> CODEX_REVIEW (project, faster than Claude Code)")
             return SkillDecision(
                 skill_type=SkillType.CODEX_REVIEW,
                 skill_name="codex_review",
-                reason="Claude Code not available, fallback to Codex (quick_reviewer) — 适合快速开发",
+                reason=f"项目级任务 (project)，使用 Codex 审查 — 速度适中",
             )
 
-        # 都不可用 → 内置 LLM
+        # 没有外部 CLI → 内置 LLM
         print(f"[TRACE] [SkillRouter] -> REVIEW (no external CLI, fallback to built-in)")
         return SkillDecision(
             skill_type=SkillType.REVIEW,
             skill_name="review.analyze_changes",
-            reason="No external CLI available, fallback to built-in LLM (simple_reviewer)",
+            reason="使用内置 LLM (doubao) 审查",
         )
