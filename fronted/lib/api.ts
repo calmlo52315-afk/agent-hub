@@ -79,6 +79,9 @@ async function request<T>(
   if (raw && raw.items === null) {
     raw.items = [];
   }
+  if (raw && raw.agents === null) {
+    raw.agents = [];
+  }
   return raw as T;
 }
 
