@@ -37,15 +37,29 @@ async function request<T>(
   const url = `${baseUrl}${path}`;
   
   // Build headers - always add Authorization header since Gateway requires it
-  const headers = {
+  const rawHeaders: Record<string, string> = {
     "Content-Type": "application/json",
-    ...options.headers,
     "Authorization": `Bearer ${TOKEN}`,
   };
 
+  // 合并调用方传入的 headers（只取可枚举自有属性，TypeScript 的 HeadersInit 有多种类型）
+  if (options.headers) {
+    if (options.headers instanceof Headers) {
+      options.headers.forEach((value, key) => {
+        rawHeaders[key] = value;
+      });
+    } else if (Array.isArray(options.headers)) {
+      for (const [key, value] of options.headers) {
+        rawHeaders[key] = value;
+      }
+    } else {
+      Object.assign(rawHeaders, options.headers);
+    }
+  }
+
   const res = await fetch(url, {
     ...options,
-    headers,
+    headers: rawHeaders,
   });
 
   if (!res.ok) {
