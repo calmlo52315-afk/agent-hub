@@ -13,18 +13,18 @@ AI 多智能体协作开发平台 — 通过 Claude Code、Codex 和内置 LLM �
 ## 🚀 Docker 一键启动
 
 ```bash
-# 1. 克隆项目
-git clone <repo-url> && cd agent_hub
-
-# 2. 配置 LLM API Key（必需）
+# 1. 配置环境变量
 cp .env.example .env
 # 编辑 .env，填入你的 MODEL_API_KEY
 
-# 3. 启动
-docker compose up -d
+# 2. 构建并启动
+docker compose up -d --build
+
+# 3. 打开浏览器
+open http://localhost:3000
 ```
 
-启动后访问 http://localhost:3000
+> 仅需 Docker Desktop。首次构建约 2-3 分钟，后续启动秒级。
 
 | 服务 | 端口 | 技术栈 |
 |---|---|---|
